@@ -42,6 +42,22 @@ export function resolveConfigValue(
   return reference;
 }
 
+export function hasConfigValue(reference: string | undefined): boolean {
+  if (!reference) return false;
+  if (reference.startsWith("!")) {
+    return reference.slice(1).trim().length > 0;
+  }
+
+  const envValue = process.env[reference];
+  if (envValue !== undefined) {
+    return envValue.length > 0;
+  }
+  if (/^[A-Z][A-Z0-9_]*$/.test(reference)) {
+    return false;
+  }
+  return reference.length > 0;
+}
+
 export function resolveEnvMap(
   envMap: Record<string, string> | undefined,
 ): Record<string, string> | undefined {

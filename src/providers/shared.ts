@@ -1,4 +1,4 @@
-import { resolveConfigValue } from "../config-values.js";
+import { hasConfigValue } from "../config-values.js";
 import type { ProviderCapabilityStatus } from "../types.js";
 
 export function trimSnippet(
@@ -47,16 +47,9 @@ export function formatJson(value: unknown): string {
 export function getApiKeyStatus(
   apiKeyReference: string | undefined,
 ): ProviderCapabilityStatus {
-  try {
-    return resolveConfigValue(apiKeyReference)
-      ? { state: "ready" }
-      : { state: "missing_api_key" };
-  } catch (error) {
-    return {
-      state: "invalid_config",
-      detail: formatConfigValueError(error),
-    };
-  }
+  return hasConfigValue(apiKeyReference)
+    ? { state: "ready" }
+    : { state: "missing_api_key" };
 }
 
 export function formatConfigValueError(error: unknown): string {

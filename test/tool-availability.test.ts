@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
@@ -330,6 +336,28 @@ describe("managed tool availability", () => {
     expect(
       __test__.getAvailableManagedToolNames(config, process.cwd()),
     ).toEqual(["web_contents", "web_research"]);
+  });
+
+  it("surfaces command-backed provider tools on startup without resolving secrets", async () => {
+    const root = mkdtempSync(join(tmpdir(), "pi-web-providers-command-"));
+    cleanupDirs.push(root);
+    const markerPath = join(root, "marker.txt");
+    const command = `!${JSON.stringify(process.execPath)} -e "require('node:fs').writeFileSync(process.argv[1], 'x')" ${JSON.stringify(markerPath)}`;
+    writeConfig({
+      tools: {
+        search: "exa",
+      },
+      providers: {
+        exa: {
+          credentials: { api: command },
+        },
+      },
+    });
+
+    const tools = await captureRegisteredTools();
+
+    expect(tools.map((tool) => tool.name)).toContain("web_search");
+    expect(existsSync(markerPath)).toBe(false);
   });
 
   it("does not expose any managed tools when nothing is mapped", () => {

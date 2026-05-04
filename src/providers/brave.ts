@@ -1,5 +1,5 @@
 import { type TObject, Type } from "typebox";
-import { resolveConfigValue } from "../config-values.js";
+import { hasConfigValue, resolveConfigValue } from "../config-values.js";
 import type {
   Brave,
   ProviderCapabilityStatus,
@@ -9,7 +9,7 @@ import type {
   ToolOutput,
 } from "../types.js";
 import { defineCapability, defineProvider } from "./definition.js";
-import { asJsonObject, formatConfigValueError, trimSnippet } from "./shared.js";
+import { asJsonObject, trimSnippet } from "./shared.js";
 
 const DEFAULT_BASE_URL = "https://api.search.brave.com";
 const BRAVE_API_VERSION: string | undefined = undefined;
@@ -353,21 +353,18 @@ const braveImplementation = {
       tool === "answer" || tool === "research"
         ? config?.credentials?.answers
         : config?.credentials?.search;
-    try {
-      if (tool)
-        return resolveConfigValue(key)
-          ? { state: "ready" }
-          : { state: "missing_api_key" };
-      return [
-        config?.credentials?.search,
-        config?.credentials?.answers,
-        config?.credentials?.autosuggest,
-      ].some((v) => resolveConfigValue(v))
+    if (tool) {
+      return hasConfigValue(key)
         ? { state: "ready" }
         : { state: "missing_api_key" };
-    } catch (error) {
-      return { state: "invalid_config", detail: formatConfigValueError(error) };
     }
+    return [
+      config?.credentials?.search,
+      config?.credentials?.answers,
+      config?.credentials?.autosuggest,
+    ].some((v) => hasConfigValue(v))
+      ? { state: "ready" }
+      : { state: "missing_api_key" };
   },
 
   async search(

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -238,33 +238,53 @@ describe("provider resolution", () => {
     ).toThrow(/Provider 'cloudflare' is not available: missing account ID/);
   });
 
-  it("reports command-backed API key failures as invalid provider config", () => {
-    const failingCommand = `!${JSON.stringify(process.execPath)} -e "process.exit(44)"`;
+  it("treats command-backed API keys as available without executing them", () => {
+    const { command, markerPath } = createMarkerCommand();
     const config = createConfig({
       tools: {
         search: "exa",
       },
       providers: {
         exa: {
-          credentials: { api: failingCommand },
+          credentials: { api: command },
         },
       },
     });
 
     expect(
       getProviderCapabilityStatus(config, process.cwd(), "exa", "search"),
-    ).toMatchObject({
-      state: "invalid_config",
-      detail: expect.stringContaining("Command failed"),
-    });
-    expect(() =>
-      resolveProviderForTool(config, process.cwd(), "search"),
-    ).toThrow(/Provider 'exa' is not available: command failed/i);
+    ).toEqual({ state: "ready" });
+    expect(resolveProviderForTool(config, process.cwd(), "search").id).toBe(
+      "exa",
+    );
+    expect(existsSync(markerPath)).toBe(false);
   });
 
-  it("reports command-backed Cloudflare account ID failures as invalid provider config", () => {
+  it("treats command-backed Brave keys as available without executing them", () => {
+    const { command, markerPath } = createMarkerCommand();
+    const config = createConfig({
+      tools: {
+        search: "brave",
+      },
+      providers: {
+        brave: {
+          credentials: { search: command },
+        },
+      },
+    });
+
+    expect(
+      getProviderCapabilityStatus(config, process.cwd(), "brave", "search"),
+    ).toEqual({ state: "ready" });
+    expect(resolveProviderForTool(config, process.cwd(), "search").id).toBe(
+      "brave",
+    );
+    expect(existsSync(markerPath)).toBe(false);
+  });
+
+  it("treats command-backed Cloudflare account IDs as available without executing them", () => {
     process.env.CLOUDFLARE_API_TOKEN = "test-token";
-    const failingCommand = `!${JSON.stringify(process.execPath)} -e "process.exit(44)"`;
+    const { command, markerPath } = createMarkerCommand();
     const config = createConfig({
       tools: {
         contents: "cloudflare",
@@ -272,7 +292,7 @@ describe("provider resolution", () => {
       providers: {
         cloudflare: {
           credentials: { api: "CLOUDFLARE_API_TOKEN" },
-          accountId: failingCommand,
+          accountId: command,
         },
       },
     });
@@ -284,10 +304,8 @@ describe("provider resolution", () => {
         "cloudflare",
         "contents",
       ),
-    ).toMatchObject({
-      state: "invalid_config",
-      detail: expect.stringContaining("Command failed"),
-    });
+    ).toEqual({ state: "ready" });
+    expect(existsSync(markerPath)).toBe(false);
   });
 
   it("rejects Custom when the mapped capability has no command configured", () => {
@@ -402,5 +420,16 @@ function createConfig(overrides: Partial<WebProviders> = {}): WebProviders {
     tools: overrides.tools,
     settings: overrides.settings,
     providers: overrides.providers,
+  };
+}
+
+function createMarkerCommand(): { command: string; markerPath: string } {
+  const root = mkdtempSync(join(tmpdir(), "pi-web-providers-command-"));
+  cleanupDirs.push(root);
+  const markerPath = join(root, "marker.txt");
+  const script = "require('node:fs').writeFileSync(process.argv[1], 'x')";
+  return {
+    command: `!${JSON.stringify(process.execPath)} -e ${JSON.stringify(script)} ${JSON.stringify(markerPath)}`,
+    markerPath,
   };
 }

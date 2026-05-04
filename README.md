@@ -87,6 +87,11 @@ settings live under `settings.search`, and async research uses
 `settings.researchTimeoutMs`. Provider option schemas are strict: only the keys
 shown for the active provider are accepted.
 
+Config values such as credentials can be literal strings, environment variable
+names, or `!command` references. Command-backed values are resolved lazily on
+first tool use, not at session startup, so secret-manager commands such as
+`!op read ...` only run when a web tool actually needs them.
+
 #### `web_search`
 
 Search the public web for up to 10 queries in one call. It returns grouped
